@@ -221,21 +221,52 @@ bingo/
 
 ## Deploy
 
-### Vercel (Frontend)
+### URLs de Produção
+| Serviço | URL |
+|---------|-----|
+| **App (Vercel)** | https://bingo-seven-neon.vercel.app |
+| **WebSocket (PartyKit)** | bingo-party.cashly-sa.partykit.dev |
+| **Código (GitHub)** | https://github.com/cashly-rent-a-car/bingo |
+
+### Deploy Automático (Recomendado)
+O deploy é **100% automático** via GitHub. Basta fazer push:
+
 ```bash
-vercel deploy
+git push
 ```
 
-### PartyKit (Realtime)
+Isso dispara:
+- **GitHub Actions** → Deploy do PartyKit (Cloudflare)
+- **Vercel Git Integration** → Deploy do Frontend
+
+### Deploy Manual (Backup)
+Se precisar fazer deploy manual:
+
 ```bash
+# Deploy completo (PartyKit + Vercel)
+npm run deploy
+
+# Apenas PartyKit
 npm run party:deploy
+
+# Apenas Vercel
+npm run vercel:deploy
+
+# Atalho: commit + push (dispara deploy automático)
+npm run deploy:push
 ```
 
-Após deploy, atualizar `.env.local`:
+### Variáveis de Ambiente (Vercel)
+Já configuradas no Vercel:
 ```
-NEXT_PUBLIC_PARTYKIT_HOST=bingo-party.seu-usuario.partykit.dev
-NEXT_PUBLIC_URL=https://seu-dominio.com
+NEXT_PUBLIC_PARTYKIT_HOST=bingo-party.cashly-sa.partykit.dev
+NEXT_PUBLIC_URL=https://bingo-seven-neon.vercel.app
 ```
+
+### Secrets do GitHub (para GitHub Actions)
+Já configurados:
+- `PARTYKIT_LOGIN` - Usuário do PartyKit
+- `PARTYKIT_TOKEN` - Token de autenticação
 
 ## O Que Falta Implementar
 
@@ -269,12 +300,20 @@ NEXT_PUBLIC_URL=http://localhost:3000      # Dev
 ## Scripts Disponíveis
 
 ```bash
-npm run dev        # Next.js dev server
-npm run dev:party  # PartyKit dev server
-npm run dev:all    # Ambos em paralelo
-npm run build      # Build de produção
-npm run start      # Servidor de produção
-npm run party:deploy  # Deploy do PartyKit
+# Desenvolvimento
+npm run dev          # Next.js dev server
+npm run dev:party    # PartyKit dev server
+npm run dev:all      # Ambos em paralelo
+
+# Build
+npm run build        # Build de produção
+npm run start        # Servidor de produção
+
+# Deploy
+npm run deploy       # Deploy completo (PartyKit + Vercel)
+npm run party:deploy # Deploy apenas PartyKit
+npm run vercel:deploy # Deploy apenas Vercel
+npm run deploy:push  # Commit + Push (dispara deploy automático)
 ```
 
 ## Licença
