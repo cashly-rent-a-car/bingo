@@ -35,6 +35,7 @@ interface GameStore {
   addPlayer: (player: Player) => void;
   removePlayer: (playerId: string) => void;
   updatePlayerAvatar: (playerId: string, avatarId: string) => void;
+  setPlayerConnected: (playerId: string, isConnected: boolean) => void;
 
   // Conexão
   isConnected: boolean;
@@ -118,6 +119,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
         [playerId]: { ...state.players[playerId], avatarId },
       },
     })),
+
+  setPlayerConnected: (playerId, isConnected) =>
+    set((state) => {
+      if (!state.players[playerId]) return state;
+      return {
+        players: {
+          ...state.players,
+          [playerId]: { ...state.players[playerId], isConnected },
+        },
+      };
+    }),
 
   setIsConnected: (connected) => set({ isConnected: connected }),
 

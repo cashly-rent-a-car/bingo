@@ -1,7 +1,7 @@
 // Tipos de mensagens WebSocket entre cliente e servidor
 
 import type { Player, RoomState } from './room';
-import type { BingoCard, BingoBall, RankingEntry } from './game';
+import type { BingoCard, BingoBall, RankingEntry, GamePhase } from './game';
 
 // ============ CLIENT -> SERVER ============
 
@@ -64,6 +64,23 @@ export interface RejoinGameMessage {
   };
 }
 
+// Nova mensagem de identificação (substitui JOIN_ROOM/REJOIN_GAME)
+export interface IdentifyMessage {
+  type: 'IDENTIFY';
+  payload: {
+    sessionToken: string | null;  // null = novo jogador
+    tabId: string;
+    playerName?: string;
+    avatarId?: string;
+    isHost?: boolean;
+  };
+}
+
+// Mensagem para voltar ao lobby (segunda rodada)
+export interface ReturnToLobbyMessage {
+  type: 'RETURN_TO_LOBBY';
+}
+
 export type ClientMessage =
   | JoinRoomMessage
   | SelectAvatarMessage
@@ -74,7 +91,9 @@ export type ClientMessage =
   | ClaimBingoMessage
   | LeaveRoomMessage
   | ClaimHostMessage
-  | RejoinGameMessage;
+  | RejoinGameMessage
+  | IdentifyMessage
+  | ReturnToLobbyMessage;
 
 // ============ SERVER -> CLIENT ============
 
@@ -216,6 +235,43 @@ export interface LateJoinSuccessMessage {
   };
 }
 
+// Confirmação de identidade (resposta ao IDENTIFY)
+export interface IdentityConfirmedMessage {
+  type: 'IDENTITY_CONFIRMED';
+  payload: {
+    sessionToken: string;
+    playerId: string;
+    isReconnection: boolean;
+    playerName: string;
+    avatarId: string;
+    isHost: boolean;
+    gamePhase: GamePhase;
+    // Se reconectando durante jogo:
+    card?: BingoCard;
+    markedNumbers?: number[];
+    drawnBalls?: BingoBall[];
+    currentBall?: BingoBall | null;
+    ranking?: RankingEntry[];
+  };
+}
+
+// Rejeição de identidade (sessão expirada/não encontrada)
+export interface IdentityRejectedMessage {
+  type: 'IDENTITY_REJECTED';
+  payload: {
+    reason: 'session_expired' | 'session_not_found' | 'game_full' | 'invalid_session';
+    message: string;
+  };
+}
+
+// Confirmação de retorno ao lobby (segunda rodada)
+export interface ReturnedToLobbyMessage {
+  type: 'RETURNED_TO_LOBBY';
+  payload: {
+    message: string;
+  };
+}
+
 export type ServerMessage =
   | RoomStateMessage
   | PlayerJoinedMessage
@@ -232,4 +288,7 @@ export type ServerMessage =
   | ErrorMessage
   | HostConnectedMessage
   | RejoinSuccessMessage
-  | LateJoinSuccessMessage;
+  | LateJoinSuccessMessage
+  | IdentityConfirmedMessage
+  | IdentityRejectedMessage
+  | ReturnedToLobbyMessage;

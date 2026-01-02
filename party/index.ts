@@ -2,12 +2,20 @@ import type * as Party from "partykit/server";
 import { generateBingoCard } from "../src/lib/bingo/card-generator";
 import { createBallPool, shuffleBalls, drawNextBall } from "../src/lib/bingo/ball-drawer";
 import { findNewlyCompletedLines, isCardComplete, calculateTotalScore } from "../src/lib/bingo/scoring";
-import type { RoomState, Player } from "../src/types/room";
+import type { RoomState, Player, SessionInfo } from "../src/types/room";
 import type { ClientMessage, ServerMessage } from "../src/types/messages";
 import type { BingoCard, RankingEntry, CompletedLine } from "../src/types/game";
 
+// Gera token único para sessão
+function generateSessionToken(): string {
+  return crypto.randomUUID();
+}
+
 export default class BingoRoom implements Party.Server {
   constructor(readonly room: Party.Room) {}
+
+  // Timers para debounce de desconexão (evita notificação durante navegação)
+  private disconnectTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
 
   // Estado da sala
   state: RoomState = {
@@ -20,6 +28,7 @@ export default class BingoRoom implements Party.Server {
     players: {},
     gamePhase: "lobby",
     game: null,
+    sessions: {},
   };
 
   // Conexões ativas
@@ -87,6 +96,14 @@ export default class BingoRoom implements Party.Server {
         case "REJOIN_GAME":
           await this.handleRejoinGame(sender, data.payload);
           break;
+
+        case "IDENTIFY":
+          await this.handleIdentify(sender, data.payload);
+          break;
+
+        case "RETURN_TO_LOBBY":
+          await this.handleReturnToLobby(sender);
+          break;
       }
     } catch (error) {
       console.error("Error processing message:", error);
@@ -110,23 +127,44 @@ export default class BingoRoom implements Party.Server {
       await this.saveState();
 
       if (this.state.gamePhase === "lobby") {
-        // No lobby, remove o jogador
+        // No lobby, remove o jogador imediatamente
         this.broadcast({
           type: "PLAYER_LEFT",
           payload: { playerId: conn.id, playerName: player.name },
         });
       } else if (this.state.gamePhase === "playing" && this.state.game) {
-        // Durante o jogo, notifica desconexão e atualiza ranking
-        this.broadcast({
-          type: "PLAYER_DISCONNECTED",
-          payload: { playerId: conn.id, playerName: player.name },
-        });
-        // Atualiza ranking com status de conexão
-        this.state.game.ranking = this.calculateRanking();
-        this.broadcast({
-          type: "RANKING_UPDATE",
-          payload: { ranking: this.state.game.ranking },
-        });
+        // Durante o jogo, usa debounce de 3 segundos antes de notificar
+        // Isso permite tempo para reconexão durante navegação de página
+        const existingTimer = this.disconnectTimers.get(conn.id);
+        if (existingTimer) {
+          clearTimeout(existingTimer);
+        }
+
+        const playerId = conn.id;
+        const playerName = player.name;
+
+        const timer = setTimeout(() => {
+          // Verifica se o jogador ainda está desconectado
+          const currentPlayer = this.state.players[playerId];
+          if (currentPlayer && !currentPlayer.isConnected) {
+            console.log("[DISCONNECT] Player", playerName, "still disconnected after debounce, notifying");
+            this.broadcast({
+              type: "PLAYER_DISCONNECTED",
+              payload: { playerId, playerName },
+            });
+            // Atualiza ranking com status de conexão
+            if (this.state.game) {
+              this.state.game.ranking = this.calculateRanking();
+              this.broadcast({
+                type: "RANKING_UPDATE",
+                payload: { ranking: this.state.game.ranking },
+              });
+            }
+          }
+          this.disconnectTimers.delete(playerId);
+        }, 3000); // 3 segundos de debounce
+
+        this.disconnectTimers.set(conn.id, timer);
       }
     }
 
@@ -549,6 +587,14 @@ export default class BingoRoom implements Party.Server {
       console.log("[REJOIN] Attempting rejoin for oldPlayerId:", payload.oldPlayerId);
       console.log("[REJOIN] Current players:", Object.keys(this.state.players));
 
+      // Cancela timer de desconexão pendente (se existir)
+      const pendingTimer = this.disconnectTimers.get(payload.oldPlayerId);
+      if (pendingTimer) {
+        clearTimeout(pendingTimer);
+        this.disconnectTimers.delete(payload.oldPlayerId);
+        console.log("[REJOIN] Cancelled pending disconnect timer for:", payload.oldPlayerId);
+      }
+
       // Busca o jogador pelo ID antigo
       const oldPlayer = this.state.players[payload.oldPlayerId];
 
@@ -628,6 +674,286 @@ export default class BingoRoom implements Party.Server {
         payload: { code: "REJOIN_ERROR", message: "Erro ao reconectar" },
       });
     }
+  }
+
+  private async handleIdentify(
+    conn: Party.Connection,
+    payload: {
+      sessionToken: string | null;
+      tabId: string;
+      playerName?: string;
+      avatarId?: string;
+      isHost?: boolean;
+    }
+  ) {
+    const { sessionToken, tabId, playerName, avatarId, isHost } = payload;
+
+    console.log("[IDENTIFY] Received:", { sessionToken: sessionToken?.slice(0, 8), tabId: tabId.slice(0, 8), playerName, isHost });
+
+    // CASO 1: Sessão existente - reconexão
+    if (sessionToken && this.state.sessions[sessionToken]) {
+      const session = this.state.sessions[sessionToken];
+      const oldPlayerId = session.playerId;
+
+      console.log("[IDENTIFY] Existing session found, reconnecting. oldPlayerId:", oldPlayerId);
+
+      // Cancela timer de desconexão pendente (se existir)
+      // Isso evita a notificação falsa de "desconectou" durante navegação
+      const pendingTimer = this.disconnectTimers.get(oldPlayerId);
+      if (pendingTimer) {
+        clearTimeout(pendingTimer);
+        this.disconnectTimers.delete(oldPlayerId);
+        console.log("[IDENTIFY] Cancelled pending disconnect timer for:", oldPlayerId);
+      }
+
+      // Atualiza sessão com nova conexão
+      session.playerId = conn.id;
+      session.lastSeenAt = Date.now();
+      session.isConnected = true;
+
+      if (!session.activeTabIds.includes(tabId)) {
+        session.activeTabIds.push(tabId);
+      }
+
+      // Transfere dados do jogador para novo connection ID (se é jogador, não host)
+      if (!session.isHost && this.state.players[oldPlayerId]) {
+        const oldPlayer = this.state.players[oldPlayerId];
+
+        // Cria novo player com novo ID
+        const newPlayer: Player = {
+          ...oldPlayer,
+          id: conn.id,
+          isConnected: true,
+        };
+
+        // Se tem cartela, atualiza playerId nela também
+        if (newPlayer.card) {
+          newPlayer.card = {
+            ...newPlayer.card,
+            playerId: conn.id,
+          };
+        }
+
+        // Remove do ID antigo e adiciona no novo
+        delete this.state.players[oldPlayerId];
+        this.state.players[conn.id] = newPlayer;
+      }
+
+      // Se é host, atualiza hostId
+      if (session.isHost) {
+        this.state.hostId = conn.id;
+      }
+
+      await this.saveState();
+
+      // Responde com dados restaurados
+      const player = this.state.players[conn.id];
+      this.send(conn, {
+        type: "IDENTITY_CONFIRMED",
+        payload: {
+          sessionToken,
+          playerId: conn.id,
+          isReconnection: true,
+          playerName: session.playerName,
+          avatarId: session.avatarId,
+          isHost: session.isHost,
+          gamePhase: this.state.gamePhase,
+          card: player?.card || undefined,
+          markedNumbers: player?.markedNumbers,
+          drawnBalls: this.state.game?.drawnBalls,
+          currentBall: this.state.game?.currentBall,
+          ranking: this.state.game?.ranking,
+        },
+      });
+
+      // Envia ROOM_STATE também para sincronizar
+      this.send(conn, {
+        type: "ROOM_STATE",
+        payload: this.state,
+      });
+
+      // Atualiza ranking para refletir reconexão
+      if (this.state.game) {
+        this.state.game.ranking = this.calculateRanking();
+        this.broadcast({
+          type: "RANKING_UPDATE",
+          payload: { ranking: this.state.game.ranking },
+        });
+      }
+
+      return;
+    }
+
+    // CASO 2: Token inválido ou expirado (enviou token mas não existe)
+    if (sessionToken && !this.state.sessions[sessionToken]) {
+      console.log("[IDENTIFY] Invalid/expired session token");
+      this.send(conn, {
+        type: "IDENTITY_REJECTED",
+        payload: {
+          reason: "session_expired",
+          message: "Sessão expirada. Por favor, entre novamente.",
+        },
+      });
+      return;
+    }
+
+    // CASO 3: Nova sessão (sessionToken é null)
+    const newToken = generateSessionToken();
+    const newSession: SessionInfo = {
+      sessionToken: newToken,
+      playerId: conn.id,
+      playerName: playerName || "",
+      avatarId: avatarId || "",
+      isHost: isHost || false,
+      activeTabIds: [tabId],
+      createdAt: Date.now(),
+      lastSeenAt: Date.now(),
+      isConnected: true,
+    };
+
+    this.state.sessions[newToken] = newSession;
+
+    console.log("[IDENTIFY] New session created:", newToken.slice(0, 8), "isHost:", isHost);
+
+    // Processa como host ou jogador
+    if (isHost) {
+      this.state.hostId = conn.id;
+      this.state.hostName = "Host";
+    } else if (playerName) {
+      const player: Player = {
+        id: conn.id,
+        name: playerName,
+        avatarId: avatarId || "",
+        joinedAt: Date.now(),
+        isHost: false,
+        isConnected: true,
+        card: null,
+        markedNumbers: [],
+        score: 0,
+        completedLines: [],
+        hasBingo: false,
+      };
+
+      // Late join - gera cartela
+      if (this.state.gamePhase === "playing" && this.state.game) {
+        const card = generateBingoCard(conn.id);
+        player.card = card;
+        console.log("[IDENTIFY] Late join - generated card for", playerName);
+
+        this.state.players[conn.id] = player;
+        await this.saveState();
+
+        // Notifica todos sobre jogador atrasado
+        this.broadcast({
+          type: "PLAYER_JOINED",
+          payload: { player, isLateJoin: true },
+        });
+
+        // Envia confirmação com dados do jogo
+        this.send(conn, {
+          type: "IDENTITY_CONFIRMED",
+          payload: {
+            sessionToken: newToken,
+            playerId: conn.id,
+            isReconnection: false,
+            playerName,
+            avatarId: avatarId || "",
+            isHost: false,
+            gamePhase: this.state.gamePhase,
+            card: player.card,
+            drawnBalls: this.state.game.drawnBalls,
+            currentBall: this.state.game.currentBall,
+            ranking: this.calculateRanking(),
+          },
+        });
+
+        this.send(conn, {
+          type: "ROOM_STATE",
+          payload: this.state,
+        });
+
+        return;
+      }
+
+      this.state.players[conn.id] = player;
+
+      // Notifica todos sobre novo jogador
+      this.broadcast({
+        type: "PLAYER_JOINED",
+        payload: { player, isLateJoin: false },
+      });
+    }
+
+    await this.saveState();
+
+    // Envia confirmação
+    this.send(conn, {
+      type: "IDENTITY_CONFIRMED",
+      payload: {
+        sessionToken: newToken,
+        playerId: conn.id,
+        isReconnection: false,
+        playerName: playerName || "",
+        avatarId: avatarId || "",
+        isHost: isHost || false,
+        gamePhase: this.state.gamePhase,
+        card: this.state.players[conn.id]?.card || undefined,
+        drawnBalls: this.state.game?.drawnBalls,
+        currentBall: this.state.game?.currentBall,
+      },
+    });
+
+    // Envia estado da sala
+    this.send(conn, {
+      type: "ROOM_STATE",
+      payload: this.state,
+    });
+  }
+
+  private async handleReturnToLobby(conn: Party.Connection) {
+    // Apenas host pode fazer isso
+    if (conn.id !== this.state.hostId) {
+      this.send(conn, {
+        type: "ERROR",
+        payload: { code: "NOT_HOST", message: "Apenas o host pode voltar ao lobby" },
+      });
+      return;
+    }
+
+    console.log("[RETURN_TO_LOBBY] Resetting game state for new round");
+
+    // Reseta estado do jogo
+    this.state.gamePhase = "lobby";
+    this.state.game = null;
+
+    // Reseta dados dos jogadores (mantém jogadores na sala)
+    for (const playerId in this.state.players) {
+      const player = this.state.players[playerId];
+      player.card = null;
+      player.markedNumbers = [];
+      player.score = 0;
+      player.completedLines = [];
+      player.hasBingo = false;
+      player.bingoCompletedAt = undefined;
+      player.bingoPosition = undefined;
+    }
+
+    // Limpa sessões para forçar re-identificação limpa
+    this.state.sessions = {};
+
+    await this.saveState();
+
+    // Notifica todos
+    this.broadcast({
+      type: "RETURNED_TO_LOBBY",
+      payload: { message: "Preparando nova rodada..." },
+    });
+
+    // Envia estado atualizado
+    this.broadcast({
+      type: "ROOM_STATE",
+      payload: this.state,
+    });
   }
 
   // ============ Helpers ============

@@ -2,6 +2,19 @@
 
 import type { BingoCard, CompletedLine, GameState, GamePhase } from './game';
 
+// Informações de sessão para persistência de jogadores
+export interface SessionInfo {
+  sessionToken: string;
+  playerId: string;
+  playerName: string;
+  avatarId: string;
+  isHost: boolean;
+  activeTabIds: string[];  // IDs das abas ativas
+  createdAt: number;
+  lastSeenAt: number;
+  isConnected: boolean;
+}
+
 export interface Player {
   id: string;
   name: string;
@@ -28,6 +41,7 @@ export interface RoomState {
   players: Record<string, Player>;
   gamePhase: GamePhase;
   game: GameState | null;
+  sessions: Record<string, SessionInfo>;  // sessionToken -> SessionInfo
 }
 
 export interface RoomConfig {

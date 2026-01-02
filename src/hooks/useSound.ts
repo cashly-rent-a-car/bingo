@@ -114,6 +114,51 @@ export function useSound() {
     pingOsc.stop(pingTime + 0.3);
   }, [getAudioContext, volume]);
 
+  // Som empolgante ao marcar número corretamente - "pop" satisfatório
+  const playNumberMarkedSynth = useCallback(() => {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    // Tom principal ascendente (pop satisfatório)
+    const mainOsc = ctx.createOscillator();
+    const mainGain = ctx.createGain();
+    mainOsc.type = 'sine';
+    mainOsc.frequency.setValueAtTime(523, ctx.currentTime); // C5
+    mainOsc.frequency.exponentialRampToValueAtTime(784, ctx.currentTime + 0.08); // sobe para G5
+    mainGain.gain.setValueAtTime(volume * 0.25, ctx.currentTime);
+    mainGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+    mainOsc.connect(mainGain);
+    mainGain.connect(ctx.destination);
+    mainOsc.start(ctx.currentTime);
+    mainOsc.stop(ctx.currentTime + 0.15);
+
+    // Harmônico (oitava acima para brilho)
+    const harmOsc = ctx.createOscillator();
+    const harmGain = ctx.createGain();
+    harmOsc.type = 'sine';
+    harmOsc.frequency.setValueAtTime(1047, ctx.currentTime); // C6
+    harmOsc.frequency.exponentialRampToValueAtTime(1568, ctx.currentTime + 0.08); // sobe para G6
+    harmGain.gain.setValueAtTime(volume * 0.12, ctx.currentTime);
+    harmGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.12);
+    harmOsc.connect(harmGain);
+    harmGain.connect(ctx.destination);
+    harmOsc.start(ctx.currentTime);
+    harmOsc.stop(ctx.currentTime + 0.12);
+
+    // "Sparkle" final - nota aguda curta
+    const sparkleOsc = ctx.createOscillator();
+    const sparkleGain = ctx.createGain();
+    sparkleOsc.type = 'sine';
+    sparkleOsc.frequency.setValueAtTime(2093, ctx.currentTime + 0.05); // C7
+    sparkleGain.gain.setValueAtTime(0, ctx.currentTime);
+    sparkleGain.gain.setValueAtTime(volume * 0.15, ctx.currentTime + 0.05);
+    sparkleGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.18);
+    sparkleOsc.connect(sparkleGain);
+    sparkleGain.connect(ctx.destination);
+    sparkleOsc.start(ctx.currentTime + 0.05);
+    sparkleOsc.stop(ctx.currentTime + 0.18);
+  }, [getAudioContext, volume]);
+
   // Toca som sintético usando Web Audio API
   const playSynth = useCallback(
     (soundName: SoundName) => {
@@ -123,6 +168,12 @@ export function useSound() {
       // Som especial para ballDraw
       if (soundName === 'ballDraw') {
         playBallDrawSynth();
+        return;
+      }
+
+      // Som especial para numberMarked
+      if (soundName === 'numberMarked') {
+        playNumberMarkedSynth();
         return;
       }
 
@@ -142,7 +193,7 @@ export function useSound() {
       oscillator.start(ctx.currentTime);
       oscillator.stop(ctx.currentTime + config.duration);
     },
-    [getAudioContext, volume, playBallDrawSynth]
+    [getAudioContext, volume, playBallDrawSynth, playNumberMarkedSynth]
   );
 
   // Pré-carrega os sons

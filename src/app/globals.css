@@ -67,6 +67,11 @@ body {
   to { transform: rotate(360deg); }
 }
 
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
 .animate-float {
   animation: float 3s ease-in-out infinite;
 }
@@ -85,6 +90,10 @@ body {
 
 .animate-spin-slow {
   animation: spin-slow 8s linear infinite;
+}
+
+.animate-shimmer {
+  animation: shimmer 2s ease-in-out infinite;
 }
 
 /* Gradientes de fundo */

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePartySocket } from '@/hooks/usePartySocket';
@@ -15,6 +15,7 @@ import { ShareRoom } from '@/components/lobby/ShareRoom';
 import { toast } from '@/components/ui/Toast';
 import { getRandomAvatar, Avatar, AVATARS } from '@/lib/constants/avatars';
 import { generateMagicLink } from '@/lib/utils/magic-link';
+import { getStoredSession, getOrCreateTabId } from '@/lib/utils/session';
 import type { ServerMessage } from '@/types/messages';
 
 export default function SalaPage() {
@@ -30,7 +31,6 @@ export default function SalaPage() {
 
   // Estado local
   const [hasJoined, setHasJoined] = useState(false);
-  const [hostJoinSent, setHostJoinSent] = useState(false); // Flag para evitar duplo envio
   const [name, setName] = useState(nameParam);
   // Usa avatar do param ou primeiro avatar como default para evitar hydration mismatch
   const [selectedAvatar, setSelectedAvatar] = useState<Avatar>(
@@ -52,10 +52,22 @@ export default function SalaPage() {
   // Sons
   const { playPlayerJoined } = useSound();
 
-  // Conexão WebSocket
+  // Verifica se já tem sessão (reconexão) - memoizado para evitar loops infinitos
+  const storedSession = useMemo(() => {
+    if (typeof window === 'undefined') return null;
+    return getStoredSession(pin);
+  }, [pin]);
+
+  // Conexão WebSocket - passa dados para IDENTIFY automatico
   const { send, isConnected: socketConnected } = usePartySocket({
     roomId: pin,
     onMessage: handleMessage,
+    // Se é host, passa isHost=true para IDENTIFY
+    // Se já tem sessão, os dados vêm do servidor
+    // Se é jogador novo, passa name/avatar após formulário
+    playerName: hasJoined ? name : storedSession?.playerName,
+    avatarId: hasJoined ? selectedAvatar.id : storedSession?.avatarId,
+    isHost: isHostParam,
   });
 
   function handleMessage(message: ServerMessage) {
@@ -93,54 +105,80 @@ export default function SalaPage() {
         router.push(`/sala/${pin}/jogar?late=true`);
         break;
 
+      case 'IDENTITY_CONFIRMED':
+        // Sessão confirmada - marca como joined
+        if (message.payload.playerName || message.payload.isHost) {
+          setHasJoined(true);
+        }
+        // Detecta entrada tardia: se gamePhase é 'playing' e não é host, é late join
+        if (message.payload.gamePhase === 'playing' && !message.payload.isHost && message.payload.card) {
+          toast('O jogo ja comecou! Voce entrou atrasado.', 'warning');
+          router.push(`/sala/${pin}/jogar?late=true`);
+        }
+        break;
+
+      case 'IDENTITY_REJECTED':
+        // Sessão rejeitada - mostra erro
+        toast(message.payload.message, 'error');
+        break;
+
+      case 'RETURNED_TO_LOBBY':
+        // Voltou ao lobby para nova rodada
+        toast(message.payload.message, 'info');
+        break;
+
       case 'ERROR':
         toast(message.payload.message, 'error');
         break;
     }
   }
 
-  // Auto-join para host (não precisa nome/avatar)
-  useEffect(() => {
-    if (socketConnected && isHostParam && !hostJoinSent) {
-      setHostJoinSent(true);
-      handleHostJoin();
-    }
-  }, [socketConnected, isHostParam, hostJoinSent]);
-
-  // Atualiza isHost na store
+  // Atualiza isHost na store quando confirmado
   useEffect(() => {
     if (currentPlayerId && hostId) {
       setIsHost(currentPlayerId === hostId);
     }
-  }, [currentPlayerId, hostId]);
+  }, [currentPlayerId, hostId, setIsHost]);
 
-  // Host entra apenas como controlador (sem nome/avatar)
-  const handleHostJoin = () => {
-    send({
-      type: 'JOIN_ROOM',
-      payload: {
-        playerName: '',
-        avatarId: '',
-        isHost: true,
-      },
-    });
-    setHasJoined(true);
-    setIsHost(true);
-  };
+  // Auto-join para host (IDENTIFY já foi enviado com isHost=true)
+  useEffect(() => {
+    if (isHostParam && socketConnected) {
+      setHasJoined(true);
+      setIsHost(true);
+    }
+  }, [isHostParam, socketConnected, setIsHost]);
+
+  // Auto-join se tem sessão válida
+  // Usa sessionToken como dependência (primitivo) para evitar loops
+  const sessionToken = storedSession?.sessionToken;
+  useEffect(() => {
+    if (sessionToken && socketConnected && !hasJoined) {
+      setHasJoined(true);
+      if (storedSession?.isHost) {
+        setIsHost(true);
+      }
+    }
+  }, [sessionToken, socketConnected, hasJoined, storedSession?.isHost, setIsHost]);
 
   // Jogador normal entra com nome e avatar
   const handleJoin = () => {
     if (!name.trim()) return;
 
     setIsJoining(true);
+
+    // Envia IDENTIFY com dados do novo jogador
+    // O hook vai enviar quando reconectar com os novos dados
     send({
-      type: 'JOIN_ROOM',
+      type: 'IDENTIFY',
       payload: {
+        sessionToken: null,
+        tabId: getOrCreateTabId(pin),
         playerName: name.trim(),
         avatarId: selectedAvatar.id,
         isHost: false,
       },
     });
+
     setHasJoined(true);
     setIsJoining(false);
   };

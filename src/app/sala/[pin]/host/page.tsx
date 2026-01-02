@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { usePartySocket } from '@/hooks/usePartySocket';
@@ -55,30 +55,28 @@ export default function HostPage() {
     avatarId: '',
   });
 
-  // Track se já enviou CLAIM_HOST (usando ref para evitar re-renders)
-  const hasClaimedHostRef = useRef(false);
+  // Host identificação via IDENTIFY automático (isHost=true vem via sessão)
   const [isHostReady, setIsHostReady] = useState(false);
 
-  // WebSocket - send será definido abaixo
+  // WebSocket - passa isHost=true se veio via URL param
   const { send, isConnected } = usePartySocket({
     roomId: pin,
     onMessage: handleMessage,
+    isHost: isHostParam,
   });
 
   function handleMessage(message: ServerMessage) {
     switch (message.type) {
-      case 'ROOM_STATE':
-        // Quando recebe ROOM_STATE e é host, envia CLAIM_HOST imediatamente
-        if (isHostParam && !hasClaimedHostRef.current) {
-          hasClaimedHostRef.current = true;
-          // Envia CLAIM_HOST para atualizar hostId no servidor
-          send({ type: 'CLAIM_HOST' });
-          // Não seta isHostReady ainda - espera confirmação do servidor
-        } else if (hasClaimedHostRef.current) {
-          // Este é um ROOM_STATE subsequente após CLAIM_HOST ter sido enviado
-          // O servidor já processou e atualizou o hostId
+      case 'IDENTITY_CONFIRMED':
+        // Host identificado via IDENTIFY automático
+        if (message.payload.isHost) {
           setIsHostReady(true);
         }
+        break;
+
+      case 'RETURNED_TO_LOBBY':
+        // Servidor resetou para nova rodada
+        router.push(`/sala/${pin}`);
         break;
 
       case 'PLAYER_JOINED':
@@ -90,8 +88,8 @@ export default function HostPage() {
         break;
 
       case 'PLAYER_DISCONNECTED':
-        // Notificação quando jogador desconecta
-        toast(`${message.payload.playerName} saiu do jogo`, 'error');
+        // Notificação quando jogador desconecta (pode ser temporário - reconexão)
+        toast(`${message.payload.playerName} desconectou`, 'warning');
         break;
 
       case 'BALL_DRAWN':
@@ -142,24 +140,24 @@ export default function HostPage() {
 
   // Verifica se é o host - usa isHostParam como autoridade (nova conexão tem ID diferente)
   useEffect(() => {
-    // Se veio com isHostParam=true, confia que é o host (já enviou CLAIM_HOST)
-    // Só redireciona se NÃO veio com isHostParam E servidor confirma que não é host
-    if (!isHostParam && roomState && serverGamePhase === 'playing' && currentPlayerId) {
+    // Se veio com isHostParam=true, confia que é o host (já enviou IDENTIFY com isHost=true)
+    // Só redireciona se conectado E NÃO veio com isHostParam E servidor confirma que não é host
+    if (isConnected && !isHostParam && roomState && serverGamePhase === 'playing' && currentPlayerId) {
       if (currentPlayerId !== roomState.hostId) {
         router.replace(`/sala/${pin}/jogar`);
       }
     }
-  }, [isHostParam, roomState, serverGamePhase, currentPlayerId, router, pin]);
+  }, [isConnected, isHostParam, roomState, serverGamePhase, currentPlayerId, router, pin]);
 
   // Se o jogo terminou e voltou para lobby (após ter começado)
   useEffect(() => {
     // Se veio como host (isHostParam), não redireciona imediatamente
-    // Espera o CLAIM_HOST ser processado e o estado ser atualizado
-    // Só redireciona se NÃO é isHostParam E servidor confirma que está em lobby
-    if (!isHostParam && roomState && serverGamePhase === 'lobby') {
+    // Espera o IDENTIFY ser processado e o estado ser atualizado
+    // Só redireciona se conectado E NÃO é isHostParam E servidor confirma que está em lobby
+    if (isConnected && !isHostParam && roomState && serverGamePhase === 'lobby') {
       router.replace(`/sala/${pin}`);
     }
-  }, [isHostParam, serverGamePhase, roomState, router, pin]);
+  }, [isConnected, isHostParam, serverGamePhase, roomState, router, pin]);
 
   const handleSpin = () => {
     send({ type: 'DRAW_BALL' });
@@ -185,11 +183,39 @@ export default function HostPage() {
             <p className="text-white/60">PIN: {pin}</p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
-            <span className="text-white/60 text-sm hidden sm:inline">
-              {drawnBalls.length}/75 bolas
+          </div>
+        </div>
+
+        {/* Progress Bar - Bolas Sorteadas */}
+        <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-4 border border-white/10">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-white/60 text-sm font-medium">Progresso do Jogo</span>
+            <span className="text-white font-bold text-lg">
+              {drawnBalls.length}<span className="text-white/40 text-sm font-normal">/75</span>
             </span>
+          </div>
+          <div className="relative h-3 bg-white/10 rounded-full overflow-hidden">
+            {/* Glow effect */}
+            <div
+              className="absolute inset-0 bg-gradient-to-r from-purple-500/20 via-pink-500/20 to-orange-500/20 blur-sm"
+              style={{ width: `${(drawnBalls.length / 75) * 100}%` }}
+            />
+            {/* Progress bar */}
+            <motion.div
+              className="relative h-full bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 rounded-full"
+              initial={{ width: 0 }}
+              animate={{ width: `${(drawnBalls.length / 75) * 100}%` }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
+            >
+              {/* Shimmer effect */}
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer" />
+            </motion.div>
+          </div>
+          <div className="flex justify-between mt-2 text-xs text-white/40">
+            <span>Bolas sorteadas</span>
+            <span>{Math.round((drawnBalls.length / 75) * 100)}%</span>
           </div>
         </div>
 

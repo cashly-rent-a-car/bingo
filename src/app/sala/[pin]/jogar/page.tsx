@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePartySocket } from '@/hooks/usePartySocket';
@@ -35,7 +35,6 @@ export default function JogarPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const pin = params.pin as string;
-  const hasRejoinedRef = useRef(false);
 
   // Verifica se é entrada tardia
   const isLateJoin = searchParams.get('late') === 'true';
@@ -74,13 +73,19 @@ export default function JogarPage() {
 
   function handleMessage(message: ServerMessage) {
     switch (message.type) {
-      case 'REJOIN_SUCCESS':
-        // Reconexão bem-sucedida - atualiza a cartela
-        const rejoinedCard = message.payload.card;
-        setMyCard(rejoinedCard);
-        setLocalCard(rejoinedCard);
-        // Atualiza o playerId no localStorage com o novo ID
-        localStorage.setItem(`bingo_player_${pin}`, message.payload.playerId);
+      case 'IDENTITY_CONFIRMED':
+        // Reconexão bem-sucedida via novo sistema IDENTIFY
+        // A cartela é restaurada pelo usePartySocket, mas atualizamos localCard
+        if (message.payload.card) {
+          setLocalCard(message.payload.card);
+        }
+        break;
+
+      case 'RETURNED_TO_LOBBY':
+        // Servidor resetou para nova rodada
+        setLocalCard(null);
+        setMyBingoCompleted(false);
+        router.push(`/sala/${pin}`);
         break;
 
       case 'GAME_STARTED':
@@ -161,53 +166,21 @@ export default function JogarPage() {
   }
 
   // Inicializa a cartela local com a do store
+  // Agora o IDENTIFY automático restaura myCard via usePartySocket
   useEffect(() => {
     if (myCard && !localCard) {
       setLocalCard(myCard);
     }
-  }, [myCard]);
-
-  // Envia REJOIN_GAME quando conectar para recuperar dados do jogador
-  useEffect(() => {
-    console.log('[JOGAR] useEffect triggered. isConnected:', isConnected, 'hasRejoined:', hasRejoinedRef.current);
-
-    if (isConnected && !hasRejoinedRef.current) {
-      const storedPlayerId = localStorage.getItem(`bingo_player_${pin}`);
-      console.log('[JOGAR] localStorage key:', `bingo_player_${pin}`);
-      console.log('[JOGAR] localStorage playerId:', storedPlayerId);
-      console.log('[JOGAR] Current connection playerId:', currentPlayerId);
-
-      // Debug: mostrar todas as chaves do localStorage que contêm 'bingo'
-      const bingoKeys = Object.keys(localStorage).filter(k => k.includes('bingo'));
-      console.log('[JOGAR] All bingo localStorage keys:', bingoKeys);
-
-      if (storedPlayerId) {
-        console.log('[JOGAR] Attempting to send REJOIN_GAME...');
-        const sent = send({
-          type: 'REJOIN_GAME',
-          payload: { oldPlayerId: storedPlayerId },
-        });
-
-        if (sent) {
-          hasRejoinedRef.current = true;
-          console.log('[JOGAR] ✅ REJOIN_GAME sent successfully');
-        } else {
-          // Socket não está pronto - não marcar hasRejoinedRef
-          // O useEffect vai rodar de novo quando isConnected mudar
-          console.log('[JOGAR] ⚠️ Socket not ready - will retry on next render');
-        }
-      } else {
-        console.log('[JOGAR] ⚠️ No stored playerId found - REJOIN will fail!');
-      }
-    }
-  }, [isConnected, pin, send, currentPlayerId]);
+  }, [myCard, localCard]);
 
   // Se o jogo não começou, volta para o lobby
+  // IMPORTANTE: Só verifica APÓS conexão estabelecida e identidade confirmada
+  // para evitar redirect prematuro durante reconexão
   useEffect(() => {
-    if (gamePhase === 'lobby') {
+    if (isConnected && gamePhase === 'lobby') {
       router.replace(`/sala/${pin}`);
     }
-  }, [gamePhase]);
+  }, [isConnected, gamePhase, router, pin]);
 
   const handleMarkNumber = (number: number, position: { row: number; col: number }) => {
     send({
