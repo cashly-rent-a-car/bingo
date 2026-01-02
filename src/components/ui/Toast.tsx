@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils/cn';
 interface Toast {
   id: string;
   message: string;
-  type: 'success' | 'error' | 'info' | 'celebration';
+  type: 'success' | 'error' | 'info' | 'celebration' | 'warning';
   duration?: number;
 }
 
@@ -26,6 +26,7 @@ function ToastItem({ id, message, type, duration = 3000, onClose }: ToastProps) 
     error: 'bg-gradient-to-r from-red-500 to-pink-500',
     info: 'bg-gradient-to-r from-blue-500 to-cyan-500',
     celebration: 'bg-gradient-to-r from-yellow-500 via-pink-500 to-purple-500',
+    warning: 'bg-gradient-to-r from-yellow-500 to-orange-500',
   };
 
   return (

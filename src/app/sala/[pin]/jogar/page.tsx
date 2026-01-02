@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePartySocket } from '@/hooks/usePartySocket';
 import { useGameStore } from '@/stores/game-store';
@@ -33,8 +33,13 @@ interface CelebrationState {
 export default function JogarPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const pin = params.pin as string;
   const hasRejoinedRef = useRef(false);
+
+  // Verifica se é entrada tardia
+  const isLateJoin = searchParams.get('late') === 'true';
+  const [showLateBanner, setShowLateBanner] = useState(isLateJoin);
 
   // Store
   const {
@@ -247,6 +252,33 @@ export default function JogarPage() {
             </div>
           </div>
         </div>
+
+        {/* Banner de entrada tardia */}
+        <AnimatePresence>
+          {showLateBanner && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="bg-yellow-500/20 border border-yellow-500/50 rounded-xl p-4 relative"
+            >
+              <button
+                onClick={() => setShowLateBanner(false)}
+                className="absolute top-2 right-2 text-yellow-400/60 hover:text-yellow-400 transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+              <p className="text-yellow-400 font-bold text-center text-lg mb-1">
+                Voce entrou atrasado!
+              </p>
+              <p className="text-yellow-300/80 text-sm text-center">
+                Algumas bolas ja foram sorteadas. Confira o gabarito para ver os numeros disponiveis.
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Toggle de visualização (mobile) */}
         <div className="flex gap-2 bg-white/10 rounded-xl p-1">

@@ -162,6 +162,16 @@ export default class BingoRoom implements Party.Server {
       hasBingo: false,
     };
 
+    // Verifica se o jogo já está em andamento (jogador atrasado)
+    const isLateJoin = this.state.gamePhase === "playing" && this.state.game !== null;
+
+    if (isLateJoin) {
+      // Gera cartela para jogador atrasado
+      const card = generateBingoCard(conn.id);
+      player.card = card;
+      console.log("[LATE_JOIN] Player", payload.playerName, "joining late with new card");
+    }
+
     this.state.players[conn.id] = player;
 
     await this.saveState();
@@ -169,8 +179,21 @@ export default class BingoRoom implements Party.Server {
     // Notifica todos sobre o novo jogador
     this.broadcast({
       type: "PLAYER_JOINED",
-      payload: { player },
+      payload: { player, isLateJoin },
     });
+
+    // Se for entrada tardia, envia estado do jogo para o jogador atrasado
+    if (isLateJoin && player.card) {
+      this.send(conn, {
+        type: "LATE_JOIN_SUCCESS",
+        payload: {
+          card: player.card,
+          drawnBalls: this.state.game!.drawnBalls,
+          currentBall: this.state.game!.currentBall,
+          ranking: this.calculateRanking(),
+        },
+      });
+    }
   }
 
   private async handleSelectAvatar(

@@ -46,7 +46,7 @@ export default function HostPage() {
   } = useGameStore();
 
   // Sons
-  const { playBallDraw, playLineComplete, playBingoWin } = useSound();
+  const { playBallDraw, playLineComplete, playBingoWin, playPlayerJoined } = useSound();
 
   // Celebração
   const [celebration, setCelebration] = useState<CelebrationState>({
@@ -78,6 +78,14 @@ export default function HostPage() {
           // Este é um ROOM_STATE subsequente após CLAIM_HOST ter sido enviado
           // O servidor já processou e atualizou o hostId
           setIsHostReady(true);
+        }
+        break;
+
+      case 'PLAYER_JOINED':
+        // Notificação especial para jogador atrasado
+        if (message.payload.isLateJoin) {
+          playPlayerJoined();
+          toast(`${message.payload.player.name} entrou ATRASADO!`, 'warning');
         }
         break;
 

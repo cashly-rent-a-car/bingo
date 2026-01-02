@@ -127,6 +127,21 @@ export function usePartySocket({ roomId, onMessage }: UsePartySocketOptions) {
             setDrawnBalls(message.payload.drawnBalls);
             break;
 
+          case 'LATE_JOIN_SUCCESS':
+            // Entrada tardia - jogador entrou após jogo iniciar
+            setMyCard(message.payload.card);
+            setDrawnBalls(message.payload.drawnBalls);
+            setRanking(message.payload.ranking);
+            setGamePhase('playing');
+            // Salva playerId no localStorage para reconexão
+            try {
+              localStorage.setItem(`bingo_player_${roomId}`, socket.id);
+              console.log('[SOCKET] Late join - stored playerId:', socket.id, 'for room:', roomId);
+            } catch (e) {
+              console.error('[SOCKET] Failed to store playerId:', e);
+            }
+            break;
+
           case 'HOST_CONNECTED':
             // Host conectou/reconectou - atualiza hostId no state
             break;

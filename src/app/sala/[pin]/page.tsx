@@ -87,6 +87,12 @@ export default function SalaPage() {
         break;
       }
 
+      case 'LATE_JOIN_SUCCESS':
+        // Jogador entrou após o jogo ter iniciado
+        toast('O jogo ja comecou! Voce entrou atrasado.', 'warning');
+        router.push(`/sala/${pin}/jogar?late=true`);
+        break;
+
       case 'ERROR':
         toast(message.payload.message, 'error');
         break;

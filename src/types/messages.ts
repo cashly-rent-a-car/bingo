@@ -87,6 +87,7 @@ export interface PlayerJoinedMessage {
   type: 'PLAYER_JOINED';
   payload: {
     player: Player;
+    isLateJoin?: boolean;  // true se entrou após o jogo iniciar
   };
 }
 
@@ -197,6 +198,16 @@ export interface RejoinSuccessMessage {
   };
 }
 
+export interface LateJoinSuccessMessage {
+  type: 'LATE_JOIN_SUCCESS';
+  payload: {
+    card: BingoCard;
+    drawnBalls: BingoBall[];
+    currentBall: BingoBall | null;
+    ranking: RankingEntry[];
+  };
+}
+
 export type ServerMessage =
   | RoomStateMessage
   | PlayerJoinedMessage
@@ -211,4 +222,5 @@ export type ServerMessage =
   | RankingUpdateMessage
   | ErrorMessage
   | HostConnectedMessage
-  | RejoinSuccessMessage;
+  | RejoinSuccessMessage
+  | LateJoinSuccessMessage;
