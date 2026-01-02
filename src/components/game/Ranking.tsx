@@ -145,39 +145,38 @@ export function Ranking({ ranking, currentPlayerId, compact = false }: RankingPr
   };
 
   return (
-    <div className="w-full">
-      <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+    <div className="w-full h-full flex flex-col">
+      <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2 flex-shrink-0">
         <span>🏆</span>
         <span>Ranking</span>
       </h3>
 
-      {/* Jogadores Online */}
-      <div className="space-y-2">
+      {/* Container com scroll interno */}
+      <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0">
+        {/* Jogadores Online */}
         <AnimatePresence mode="popLayout">
           {onlinePlayers.map((entry) => renderPlayer(entry, false))}
         </AnimatePresence>
-      </div>
 
-      {/* Jogadores Offline */}
-      {offlinePlayers.length > 0 && (
-        <div className="mt-4">
-          <div className="text-sm font-medium text-red-400/80 mb-2 flex items-center gap-2">
-            <span>📴</span>
-            <span>Desconectados ({offlinePlayers.length})</span>
-          </div>
-          <div className="space-y-2">
+        {/* Jogadores Offline */}
+        {offlinePlayers.length > 0 && (
+          <div className="mt-3 pt-3 border-t border-white/10">
+            <div className="text-sm font-medium text-red-400/80 mb-2 flex items-center gap-2">
+              <span>📴</span>
+              <span>Desconectados ({offlinePlayers.length})</span>
+            </div>
             <AnimatePresence mode="popLayout">
               {offlinePlayers.map((entry) => renderPlayer(entry, true))}
             </AnimatePresence>
           </div>
-        </div>
-      )}
+        )}
 
-      {ranking.length === 0 && (
-        <div className="text-center text-white/40 py-4">
-          Aguardando jogadores marcarem numeros...
-        </div>
-      )}
+        {ranking.length === 0 && (
+          <div className="text-center text-white/40 py-4">
+            Aguardando jogadores marcarem numeros...
+          </div>
+        )}
+      </div>
     </div>
   );
 }

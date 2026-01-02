@@ -34,7 +34,7 @@ export function GlobeSpinner({
   };
 
   return (
-    <div className="flex flex-col items-center gap-6">
+    <div className="flex flex-col items-center gap-4">
       {/* Globo */}
       <div className="relative">
         {/* Efeito de brilho */}
@@ -124,13 +124,6 @@ export function GlobeSpinner({
           {/* Base do globo */}
           <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-32 h-8 bg-gradient-to-b from-gray-700 to-gray-800 rounded-b-full border-2 border-gray-600" />
         </motion.div>
-      </div>
-
-      {/* Contador de bolas restantes */}
-      <div className="text-center">
-        <span className="text-white/60 text-sm">
-          {remainingBalls} bolas restantes
-        </span>
       </div>
 
       {/* Botão girar */}

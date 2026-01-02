@@ -166,37 +166,34 @@ export default function HostPage() {
   const remainingBalls = roomState?.game?.remainingBalls.length ?? 75;
 
   return (
-    <main className="min-h-screen flex flex-col p-4 sm:p-6">
+    <main className="h-screen flex flex-col p-3 sm:p-4 lg:p-5 overflow-hidden">
       {/* Background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/4 -left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl" />
         <div className="absolute bottom-1/4 -right-1/4 w-96 h-96 bg-pink-600/20 rounded-full blur-3xl" />
       </div>
 
-      <div className="relative z-10 max-w-6xl mx-auto w-full flex flex-col gap-6 flex-1">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-black text-white">
+      <div className="relative z-10 max-w-7xl mx-auto w-full flex flex-col gap-3 lg:gap-4 flex-1 min-h-0">
+        {/* Header compacto inline */}
+        <div className="flex items-center justify-between flex-shrink-0">
+          <div className="flex items-center gap-4">
+            <h1 className="text-xl sm:text-2xl font-black text-white">
               Bingo - Host
             </h1>
-            <p className="text-white/60">PIN: {pin}</p>
+            <span className="text-white/40 text-sm font-mono">PIN: {pin}</span>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
-          </div>
-        </div>
-
-        {/* Progress Bar - Bolas Sorteadas */}
-        <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-4 border border-white/10">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-white/60 text-sm font-medium">Progresso do Jogo</span>
-            <span className="text-white font-bold text-lg">
+          <div className="flex items-center gap-2">
+            <div className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+            <span className="text-white font-bold">
               {drawnBalls.length}<span className="text-white/40 text-sm font-normal">/75</span>
             </span>
           </div>
-          <div className="relative h-3 bg-white/10 rounded-full overflow-hidden">
+        </div>
+
+        {/* Progress Bar compacto */}
+        <div className="flex-shrink-0">
+          <div className="relative h-2 bg-white/10 rounded-full overflow-hidden">
             {/* Glow effect */}
             <div
               className="absolute inset-0 bg-gradient-to-r from-purple-500/20 via-pink-500/20 to-orange-500/20 blur-sm"
@@ -213,18 +210,13 @@ export default function HostPage() {
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer" />
             </motion.div>
           </div>
-          <div className="flex justify-between mt-2 text-xs text-white/40">
-            <span>Bolas sorteadas</span>
-            <span>{Math.round((drawnBalls.length / 75) * 100)}%</span>
-          </div>
         </div>
 
-        {/* Conteúdo principal */}
-        <div className="grid lg:grid-cols-3 gap-6 flex-1">
-          {/* Coluna esquerda - Globo e Gabarito */}
-          <div className="lg:col-span-2 flex flex-col gap-6">
-            {/* Globo */}
-            <Card className="p-6 flex items-center justify-center">
+        {/* Conteúdo principal - Layout responsivo */}
+        <div className="grid lg:grid-cols-12 gap-3 lg:gap-4 flex-1 min-h-0 overflow-hidden lg:overflow-visible">
+          {/* Coluna esquerda - Globo */}
+          <div className="lg:col-span-3 flex items-center justify-center">
+            <Card className="p-4 lg:p-5 w-full h-full flex items-center justify-center">
               <GlobeSpinner
                 currentBall={currentBall}
                 onSpin={handleSpin}
@@ -232,22 +224,27 @@ export default function HostPage() {
                 disabled={gamePhase === 'ended' || !isHostReady}
               />
             </Card>
+          </div>
 
+          {/* Coluna central - Gabarito */}
+          <div className="lg:col-span-5 min-h-0">
             {/* Gabarito - Desktop */}
-            <Card className="p-6 hidden lg:block">
-              <h3 className="text-lg font-bold text-white mb-4">Números Sorteados</h3>
-              <DrawnNumbers drawnBalls={drawnBalls} currentBall={currentBall} />
+            <Card className="p-4 hidden lg:flex flex-col h-full">
+              <h3 className="text-base font-bold text-white mb-3 flex-shrink-0">Números Sorteados</h3>
+              <div className="flex-1 overflow-auto">
+                <DrawnNumbers drawnBalls={drawnBalls} currentBall={currentBall} />
+              </div>
             </Card>
 
             {/* Gabarito - Mobile (compacto) */}
-            <Card className="p-4 lg:hidden">
+            <Card className="p-3 lg:hidden">
               <h3 className="text-sm font-bold text-white mb-2">Números Sorteados</h3>
               <DrawnNumbers drawnBalls={drawnBalls} currentBall={currentBall} compact />
             </Card>
           </div>
 
           {/* Coluna direita - Ranking */}
-          <Card className="p-6">
+          <Card className="lg:col-span-4 p-4 min-h-0 flex flex-col">
             <Ranking ranking={ranking} currentPlayerId={currentPlayerId || undefined} />
           </Card>
         </div>

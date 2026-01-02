@@ -114,49 +114,76 @@ export function useSound() {
     pingOsc.stop(pingTime + 0.3);
   }, [getAudioContext, volume]);
 
-  // Som empolgante ao marcar número corretamente - "pop" satisfatório
+  // Som estilo Slot Machine - mini vitória ao marcar número
   const playNumberMarkedSynth = useCallback(() => {
     const ctx = getAudioContext();
     if (!ctx) return;
 
-    // Tom principal ascendente (pop satisfatório)
-    const mainOsc = ctx.createOscillator();
-    const mainGain = ctx.createGain();
-    mainOsc.type = 'sine';
-    mainOsc.frequency.setValueAtTime(523, ctx.currentTime); // C5
-    mainOsc.frequency.exponentialRampToValueAtTime(784, ctx.currentTime + 0.08); // sobe para G5
-    mainGain.gain.setValueAtTime(volume * 0.25, ctx.currentTime);
-    mainGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
-    mainOsc.connect(mainGain);
-    mainGain.connect(ctx.destination);
-    mainOsc.start(ctx.currentTime);
-    mainOsc.stop(ctx.currentTime + 0.15);
+    // Escala rápida ascendente (estilo caça-níquel)
+    const scaleNotes = [523, 659, 784, 880, 1047]; // C5, E5, G5, A5, C6
+    const noteDuration = 0.045;
+    const noteVolume = volume * 0.18;
 
-    // Harmônico (oitava acima para brilho)
-    const harmOsc = ctx.createOscillator();
-    const harmGain = ctx.createGain();
-    harmOsc.type = 'sine';
-    harmOsc.frequency.setValueAtTime(1047, ctx.currentTime); // C6
-    harmOsc.frequency.exponentialRampToValueAtTime(1568, ctx.currentTime + 0.08); // sobe para G6
-    harmGain.gain.setValueAtTime(volume * 0.12, ctx.currentTime);
-    harmGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.12);
-    harmOsc.connect(harmGain);
-    harmGain.connect(ctx.destination);
-    harmOsc.start(ctx.currentTime);
-    harmOsc.stop(ctx.currentTime + 0.12);
+    scaleNotes.forEach((freq, index) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
 
-    // "Sparkle" final - nota aguda curta
-    const sparkleOsc = ctx.createOscillator();
-    const sparkleGain = ctx.createGain();
-    sparkleOsc.type = 'sine';
-    sparkleOsc.frequency.setValueAtTime(2093, ctx.currentTime + 0.05); // C7
-    sparkleGain.gain.setValueAtTime(0, ctx.currentTime);
-    sparkleGain.gain.setValueAtTime(volume * 0.15, ctx.currentTime + 0.05);
-    sparkleGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.18);
-    sparkleOsc.connect(sparkleGain);
-    sparkleGain.connect(ctx.destination);
-    sparkleOsc.start(ctx.currentTime + 0.05);
-    sparkleOsc.stop(ctx.currentTime + 0.18);
+      osc.type = 'square'; // Som mais "arcade/cassino"
+      osc.frequency.setValueAtTime(freq, ctx.currentTime);
+
+      const startTime = ctx.currentTime + index * noteDuration;
+      gain.gain.setValueAtTime(0, startTime);
+      gain.gain.linearRampToValueAtTime(noteVolume, startTime + 0.008);
+      gain.gain.exponentialRampToValueAtTime(0.01, startTime + noteDuration * 0.9);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(startTime);
+      osc.stop(startTime + noteDuration);
+    });
+
+    // Acorde final de vitória (após a escala)
+    const chordTime = ctx.currentTime + scaleNotes.length * noteDuration;
+    const chordNotes = [1047, 1319, 1568]; // C6, E6, G6 - acorde maior brilhante
+    const chordDuration = 0.25;
+    const chordVolume = volume * 0.2;
+
+    chordNotes.forEach((freq) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sine'; // Suaviza o acorde final
+      osc.frequency.setValueAtTime(freq, ctx.currentTime);
+
+      gain.gain.setValueAtTime(0, chordTime);
+      gain.gain.linearRampToValueAtTime(chordVolume, chordTime + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.01, chordTime + chordDuration);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(chordTime);
+      osc.stop(chordTime + chordDuration);
+    });
+
+    // "Bling" agudo final - sensação de recompensa
+    const blingOsc = ctx.createOscillator();
+    const blingGain = ctx.createGain();
+    const blingTime = chordTime + 0.05;
+
+    blingOsc.type = 'sine';
+    blingOsc.frequency.setValueAtTime(2093, ctx.currentTime); // C7
+
+    blingGain.gain.setValueAtTime(0, blingTime);
+    blingGain.gain.linearRampToValueAtTime(volume * 0.25, blingTime + 0.01);
+    blingGain.gain.exponentialRampToValueAtTime(0.01, blingTime + 0.2);
+
+    blingOsc.connect(blingGain);
+    blingGain.connect(ctx.destination);
+
+    blingOsc.start(blingTime);
+    blingOsc.stop(blingTime + 0.2);
   }, [getAudioContext, volume]);
 
   // Toca som sintético usando Web Audio API
