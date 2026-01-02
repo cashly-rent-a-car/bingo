@@ -4,20 +4,35 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:party": "partykit dev",
+    "clean:ports": "npx kill-port 3000 1999 --silent || true",
+    "clean:lock": "node -e \"try{require('fs').unlinkSync('.next/dev/lock')}catch(e){}\"",
+    "predev:all": "npm run clean:ports && npm run clean:lock",
+    "dev:all": "concurrently \"npm run dev\" \"npm run dev:party\"",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "party:deploy": "partykit deploy"
   },
   "dependencies": {
+    "clsx": "^2.1.1",
+    "framer-motion": "^12.23.26",
+    "lottie-react": "^2.4.1",
     "next": "16.1.1",
+    "partykit": "^0.0.115",
+    "partysocket": "^1.1.10",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "tailwind-merge": "^3.4.0",
+    "zod": "^4.3.4",
+    "zustand": "^5.0.9"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "concurrently": "^9.2.1",
     "eslint": "^9",
     "eslint-config-next": "16.1.1",
     "tailwindcss": "^4",
