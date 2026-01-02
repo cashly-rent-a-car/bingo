@@ -99,6 +99,14 @@ export interface PlayerLeftMessage {
   };
 }
 
+export interface PlayerDisconnectedMessage {
+  type: 'PLAYER_DISCONNECTED';
+  payload: {
+    playerId: string;
+    playerName: string;
+  };
+}
+
 export interface AvatarChangedMessage {
   type: 'AVATAR_CHANGED';
   payload: {
@@ -212,6 +220,7 @@ export type ServerMessage =
   | RoomStateMessage
   | PlayerJoinedMessage
   | PlayerLeftMessage
+  | PlayerDisconnectedMessage
   | AvatarChangedMessage
   | GameStartedMessage
   | BallDrawnMessage

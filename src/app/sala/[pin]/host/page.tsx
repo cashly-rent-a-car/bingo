@@ -89,6 +89,11 @@ export default function HostPage() {
         }
         break;
 
+      case 'PLAYER_DISCONNECTED':
+        // Notificação quando jogador desconecta
+        toast(`${message.payload.playerName} saiu do jogo`, 'error');
+        break;
+
       case 'BALL_DRAWN':
         playBallDraw();
         break;

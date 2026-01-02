@@ -109,12 +109,23 @@ export default class BingoRoom implements Party.Server {
       player.isConnected = false;
       await this.saveState();
 
-      // Só envia PLAYER_LEFT no lobby
-      // Durante o jogo, conexões fecham ao navegar entre páginas (reconexão esperada)
       if (this.state.gamePhase === "lobby") {
+        // No lobby, remove o jogador
         this.broadcast({
           type: "PLAYER_LEFT",
           payload: { playerId: conn.id, playerName: player.name },
+        });
+      } else if (this.state.gamePhase === "playing" && this.state.game) {
+        // Durante o jogo, notifica desconexão e atualiza ranking
+        this.broadcast({
+          type: "PLAYER_DISCONNECTED",
+          payload: { playerId: conn.id, playerName: player.name },
+        });
+        // Atualiza ranking com status de conexão
+        this.state.game.ranking = this.calculateRanking();
+        this.broadcast({
+          type: "RANKING_UPDATE",
+          payload: { ranking: this.state.game.ranking },
         });
       }
     }
@@ -644,6 +655,7 @@ export default class BingoRoom implements Party.Server {
       linesCompleted: player.completedLines.length,
       position: index + 1,
       previousPosition: index + 1, // Simplificado
+      isConnected: player.isConnected,
     }));
   }
 

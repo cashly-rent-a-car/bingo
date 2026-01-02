@@ -38,6 +38,7 @@ export interface RankingEntry {
   linesCompleted: number;
   position: number;
   previousPosition: number;
+  isConnected: boolean;
 }
 
 export interface GameState {
