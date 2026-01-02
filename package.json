@@ -12,7 +12,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "party:deploy": "partykit deploy"
+    "party:deploy": "partykit deploy",
+    "vercel:deploy": "vercel --prod",
+    "deploy": "npm run party:deploy && npm run vercel:deploy",
+    "deploy:push": "git add . && git commit -m \"deploy\" && git push"
   },
   "dependencies": {
     "clsx": "^2.1.1",
