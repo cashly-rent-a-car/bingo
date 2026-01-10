@@ -121,6 +121,8 @@ export default class BingoRoom implements Party.Server {
     // Host não é jogador, apenas remove da conexão
     if (conn.id === this.state.hostId) {
       this.connections.delete(conn.id);
+      // Atualiza admin quando host desconecta
+      await this.reportToAdmin('UPDATE_ROOM');
       return;
     }
 
@@ -131,10 +133,14 @@ export default class BingoRoom implements Party.Server {
 
       if (this.state.gamePhase === "lobby") {
         // No lobby, remove o jogador imediatamente
+        delete this.state.players[conn.id];
+        await this.saveState();
         this.broadcast({
           type: "PLAYER_LEFT",
           payload: { playerId: conn.id, playerName: player.name },
         });
+        // Atualiza admin
+        await this.reportToAdmin('UPDATE_ROOM');
       } else if (this.state.gamePhase === "playing" && this.state.game) {
         // Durante o jogo, usa debounce de 3 segundos antes de notificar
         // Isso permite tempo para reconexão durante navegação de página
@@ -142,6 +148,9 @@ export default class BingoRoom implements Party.Server {
         if (existingTimer) {
           clearTimeout(existingTimer);
         }
+
+        // Atualiza admin imediatamente (connectedCount muda)
+        await this.reportToAdmin('UPDATE_ROOM');
 
         const playerId = conn.id;
         const playerName = player.name;
@@ -168,6 +177,9 @@ export default class BingoRoom implements Party.Server {
         }, 3000); // 3 segundos de debounce
 
         this.disconnectTimers.set(conn.id, timer);
+      } else {
+        // Fase ended ou outra - atualiza admin
+        await this.reportToAdmin('UPDATE_ROOM');
       }
     }
 
