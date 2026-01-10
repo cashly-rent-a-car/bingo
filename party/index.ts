@@ -1047,6 +1047,7 @@ export default class BingoRoom implements Party.Server {
           gamePhase: this.state.gamePhase,
           playerCount: players.length,
           connectedCount: players.filter(p => p.isConnected).length,
+          activeConnections: this.connections.size, // Inclui host + players
           createdAt: this.state.createdAt,
           lastActivity: Date.now(),
         };

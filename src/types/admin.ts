@@ -5,6 +5,7 @@ export interface RoomStats {
   gamePhase: 'lobby' | 'playing' | 'ended';
   playerCount: number;
   connectedCount: number;
+  activeConnections: number; // Total WebSocket connections (host + players)
   createdAt: number;
   lastActivity: number;
 }

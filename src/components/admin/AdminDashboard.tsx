@@ -38,10 +38,10 @@ function getPhaseInfo(phase: RoomStats['gamePhase']): { icon: string; label: str
 export function AdminDashboard({ stats }: AdminDashboardProps) {
   const rooms = Object.values(stats.rooms).sort((a, b) => b.lastActivity - a.lastActivity);
 
-  // Salas com pelo menos 1 pessoa conectada (realmente online)
-  const onlineRooms = rooms.filter(r => r.connectedCount > 0);
-  // Salas sem ninguém conectado (dormentes - regra 24h)
-  const dormantRooms = rooms.filter(r => r.connectedCount === 0);
+  // Salas com pelo menos 1 conexão WebSocket ativa (host ou jogador)
+  const onlineRooms = rooms.filter(r => (r.activeConnections ?? r.connectedCount) > 0);
+  // Salas sem nenhuma conexão ativa (dormentes - regra 24h)
+  const dormantRooms = rooms.filter(r => (r.activeConnections ?? r.connectedCount) === 0);
 
   return (
     <div className="space-y-6">
@@ -112,7 +112,8 @@ export function AdminDashboard({ stats }: AdminDashboardProps) {
               <tbody>
                 {rooms.map((room, index) => {
                   const phase = getPhaseInfo(room.gamePhase);
-                  const isOnline = room.connectedCount > 0;
+                  // Usa activeConnections se disponível, senão connectedCount (compatibilidade)
+                  const isOnline = (room.activeConnections ?? room.connectedCount) > 0;
                   return (
                     <motion.tr
                       key={room.pin}
