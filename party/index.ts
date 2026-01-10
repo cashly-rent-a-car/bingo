@@ -5,6 +5,7 @@ import { findNewlyCompletedLines, isCardComplete, calculateTotalScore } from "..
 import type { RoomState, Player, SessionInfo } from "../src/types/room";
 import type { ClientMessage, ServerMessage } from "../src/types/messages";
 import type { BingoCard, RankingEntry, CompletedLine } from "../src/types/game";
+import type { RoomStats } from "../src/types/admin";
 
 // Gera token único para sessão
 function generateSessionToken(): string {
@@ -44,6 +45,8 @@ export default class BingoRoom implements Party.Server {
       this.state.pin = this.room.id;
       this.state.magicLink = `${process.env.NEXT_PUBLIC_URL || ""}/sala/${this.room.id}`;
     }
+    // Registra sala no admin
+    await this.reportToAdmin('REGISTER_ROOM');
   }
 
   async onConnect(conn: Party.Connection, ctx: Party.ConnectionContext) {
@@ -231,6 +234,9 @@ export default class BingoRoom implements Party.Server {
       payload: { player, isLateJoin },
     });
 
+    // Atualiza admin
+    await this.reportToAdmin('UPDATE_ROOM');
+
     // Se for entrada tardia, envia estado do jogo para o jogador atrasado
     if (isLateJoin && player.card) {
       this.send(conn, {
@@ -308,6 +314,9 @@ export default class BingoRoom implements Party.Server {
       type: "GAME_STARTED",
       payload: { cards },
     });
+
+    // Atualiza admin
+    await this.reportToAdmin('UPDATE_ROOM');
   }
 
   private async handleDrawBall(conn: Party.Connection) {
@@ -539,6 +548,9 @@ export default class BingoRoom implements Party.Server {
           finalScores: this.calculateRanking(),
         },
       });
+
+      // Atualiza admin
+      await this.reportToAdmin('UPDATE_ROOM');
     }
   }
 
@@ -552,6 +564,9 @@ export default class BingoRoom implements Party.Server {
         type: "PLAYER_LEFT",
         payload: { playerId: conn.id, playerName: player.name },
       });
+
+      // Atualiza admin
+      await this.reportToAdmin('UPDATE_ROOM');
     }
   }
 
@@ -954,6 +969,9 @@ export default class BingoRoom implements Party.Server {
       type: "ROOM_STATE",
       payload: this.state,
     });
+
+    // Atualiza admin
+    await this.reportToAdmin('UPDATE_ROOM');
   }
 
   // ============ Helpers ============
@@ -995,5 +1013,40 @@ export default class BingoRoom implements Party.Server {
 
   private async saveState() {
     await this.room.storage.put("state", this.state);
+  }
+
+  // Reporta stats para o admin room
+  private async reportToAdmin(type: 'REGISTER_ROOM' | 'UPDATE_ROOM' | 'REMOVE_ROOM') {
+    try {
+      const adminRoom = this.room.context.parties.admin.get("__admin__");
+
+      if (type === 'REMOVE_ROOM') {
+        await adminRoom.fetch({
+          method: 'POST',
+          body: JSON.stringify({
+            type: 'REMOVE_ROOM',
+            payload: { pin: this.state.pin }
+          })
+        });
+      } else {
+        const players = Object.values(this.state.players);
+        const stats: RoomStats = {
+          pin: this.state.pin,
+          gamePhase: this.state.gamePhase,
+          playerCount: players.length,
+          connectedCount: players.filter(p => p.isConnected).length,
+          createdAt: this.state.createdAt,
+          lastActivity: Date.now(),
+        };
+
+        await adminRoom.fetch({
+          method: 'POST',
+          body: JSON.stringify({ type, payload: stats })
+        });
+      }
+    } catch (error) {
+      // Silently fail - admin reporting is not critical
+      console.error("[ADMIN_REPORT] Error:", error);
+    }
   }
 }
