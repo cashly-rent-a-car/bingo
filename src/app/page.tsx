@@ -83,9 +83,14 @@ export default function HomePage() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.2 }}
-          className="text-center text-white/40 text-sm"
+          className="text-center text-white/40 text-sm space-y-2"
         >
           <p>Gratuito para até 5 jogadores por sala</p>
+          <p>
+            <a href="/como-jogar" className="hover:text-white/60 underline transition-colors">
+              Como jogar?
+            </a>
+          </p>
         </motion.div>
       </div>
     </main>
