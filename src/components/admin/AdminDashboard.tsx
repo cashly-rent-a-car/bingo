@@ -117,7 +117,7 @@ export function AdminDashboard({ stats }: AdminDashboardProps) {
                   <th className="px-4 py-3 font-medium">Status</th>
                   <th className="px-4 py-3 font-medium text-center">Jogadores</th>
                   <th className="px-4 py-3 font-medium">Criada</th>
-                  <th className="px-4 py-3 font-medium text-right">Atividade</th>
+                  <th className="px-4 py-3 font-medium text-right">Última Atividade</th>
                 </tr>
               </thead>
               <tbody>
