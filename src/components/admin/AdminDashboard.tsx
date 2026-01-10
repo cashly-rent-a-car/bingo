@@ -24,6 +24,16 @@ function formatTime(timestamp: number): string {
   });
 }
 
+function formatDateTime(timestamp: number): string {
+  const date = new Date(timestamp);
+  return date.toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 function getPhaseInfo(phase: RoomStats['gamePhase']): { icon: string; label: string; color: string } {
   switch (phase) {
     case 'lobby':
@@ -106,6 +116,7 @@ export function AdminDashboard({ stats }: AdminDashboardProps) {
                   <th className="px-4 py-3 font-medium">PIN</th>
                   <th className="px-4 py-3 font-medium">Status</th>
                   <th className="px-4 py-3 font-medium text-center">Jogadores</th>
+                  <th className="px-4 py-3 font-medium">Criada</th>
                   <th className="px-4 py-3 font-medium text-right">Atividade</th>
                 </tr>
               </thead>
@@ -150,6 +161,9 @@ export function AdminDashboard({ stats }: AdminDashboardProps) {
                             <span className="text-[10px] text-white/30">offline</span>
                           )}
                         </div>
+                      </td>
+                      <td className="px-4 py-3 text-white/60 text-sm">
+                        {formatDateTime(room.createdAt)}
                       </td>
                       <td className="px-4 py-3 text-right text-white/60 text-sm">
                         {formatTimeAgo(room.lastActivity)}

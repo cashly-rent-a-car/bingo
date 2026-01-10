@@ -52,6 +52,9 @@ export default class BingoRoom implements Party.Server {
   async onConnect(conn: Party.Connection, ctx: Party.ConnectionContext) {
     this.connections.set(conn.id, conn);
 
+    // Atualiza admin com nova conexão
+    await this.reportToAdmin('UPDATE_ROOM');
+
     // Envia estado atual para o novo conectado
     this.send(conn, {
       type: "ROOM_STATE",
@@ -118,9 +121,12 @@ export default class BingoRoom implements Party.Server {
   }
 
   async onClose(conn: Party.Connection) {
-    // Host não é jogador, apenas remove da conexão
+    // PRIMEIRO: Remove da conexão ANTES de reportar ao admin
+    // Isso garante que activeConnections reflita o valor correto
+    this.connections.delete(conn.id);
+
+    // Host não é jogador
     if (conn.id === this.state.hostId) {
-      this.connections.delete(conn.id);
       // Atualiza admin quando host desconecta
       await this.reportToAdmin('UPDATE_ROOM');
       return;
@@ -181,9 +187,10 @@ export default class BingoRoom implements Party.Server {
         // Fase ended ou outra - atualiza admin
         await this.reportToAdmin('UPDATE_ROOM');
       }
+    } else {
+      // Conexão não era host nem jogador - ainda assim atualiza admin
+      await this.reportToAdmin('UPDATE_ROOM');
     }
-
-    this.connections.delete(conn.id);
   }
 
   // ============ Handlers ============
@@ -208,6 +215,9 @@ export default class BingoRoom implements Party.Server {
         type: "HOST_CONNECTED",
         payload: { hostId: conn.id },
       });
+
+      // Atualiza admin
+      await this.reportToAdmin('UPDATE_ROOM');
       return;
     }
 
