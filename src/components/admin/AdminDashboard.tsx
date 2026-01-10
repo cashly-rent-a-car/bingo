@@ -38,31 +38,48 @@ function getPhaseInfo(phase: RoomStats['gamePhase']): { icon: string; label: str
 export function AdminDashboard({ stats }: AdminDashboardProps) {
   const rooms = Object.values(stats.rooms).sort((a, b) => b.lastActivity - a.lastActivity);
 
+  // Salas com pelo menos 1 pessoa conectada (realmente online)
+  const onlineRooms = rooms.filter(r => r.connectedCount > 0);
+  // Salas sem ninguém conectado (dormentes - regra 24h)
+  const dormantRooms = rooms.filter(r => r.connectedCount === 0);
+
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-3 gap-3">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-6 text-center"
+          className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4 text-center"
         >
-          <div className="text-4xl font-bold text-white mb-1">
-            {stats.totalRooms}
+          <div className="text-3xl font-bold text-green-400 mb-1">
+            {onlineRooms.length}
           </div>
-          <div className="text-white/60 text-sm">Salas Ativas</div>
+          <div className="text-white/60 text-xs">Salas Online</div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4 text-center"
+        >
+          <div className="text-3xl font-bold text-white/40 mb-1">
+            {dormantRooms.length}
+          </div>
+          <div className="text-white/60 text-xs">Dormentes (24h)</div>
         </motion.div>
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-6 text-center"
+          className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4 text-center"
         >
-          <div className="text-4xl font-bold text-white mb-1">
+          <div className="text-3xl font-bold text-white mb-1">
             {stats.totalPlayers}
           </div>
-          <div className="text-white/60 text-sm">Jogadores Online</div>
+          <div className="text-white/60 text-xs">Jogadores Online</div>
         </motion.div>
       </div>
 
@@ -95,18 +112,26 @@ export function AdminDashboard({ stats }: AdminDashboardProps) {
               <tbody>
                 {rooms.map((room, index) => {
                   const phase = getPhaseInfo(room.gamePhase);
+                  const isOnline = room.connectedCount > 0;
                   return (
                     <motion.tr
                       key={room.pin}
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.05 * index }}
-                      className="border-b border-white/5 hover:bg-white/5 transition-colors"
+                      className={`border-b border-white/5 hover:bg-white/5 transition-colors ${!isOnline ? 'opacity-50' : ''}`}
                     >
                       <td className="px-4 py-3">
-                        <span className="font-mono text-white font-medium">
-                          {room.pin}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          {/* Indicador online/offline */}
+                          <span
+                            className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-400' : 'bg-white/30'}`}
+                            title={isOnline ? 'Online' : 'Dormante (regra 24h)'}
+                          />
+                          <span className="font-mono text-white font-medium">
+                            {room.pin}
+                          </span>
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <span className={`flex items-center gap-1.5 ${phase.color}`}>
@@ -115,10 +140,15 @@ export function AdminDashboard({ stats }: AdminDashboardProps) {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <span className="text-white">
-                          {room.connectedCount}
-                          <span className="text-white/40">/{room.playerCount}</span>
-                        </span>
+                        <div className="flex flex-col items-center">
+                          <span className={isOnline ? 'text-white' : 'text-white/40'}>
+                            {room.connectedCount}
+                            <span className="text-white/40">/{room.playerCount}</span>
+                          </span>
+                          {room.connectedCount === 0 && room.playerCount > 0 && (
+                            <span className="text-[10px] text-white/30">offline</span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-right text-white/60 text-sm">
                         {formatTimeAgo(room.lastActivity)}
